@@ -1,0 +1,296 @@
+/*---- ベース ----*/
+:root {
+    --border: #d7dce3;
+    --muted: #6b7280;
+    --primary: #2563eb;
+    --danger: #dc2626;
+    --bg: #f6f7f9;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: #1f2937;
+    font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, system-ui, sans-serif;
+    line-height: 1.7;
+}
+
+a {
+    color: var(--primary);
+}
+
+/*---- ヘッダー / フッター ----*/
+header {
+    background: #1f2937;
+    padding: 0 24px;
+}
+
+header nav {
+    display: flex;
+    gap: 20px;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 14px 0;
+}
+
+header nav a {
+    color: #e5e7eb;
+    text-decoration: none;
+    font-size: 15px;
+}
+
+header nav a:hover {
+    color: #fff;
+    text-decoration: underline;
+}
+
+main {
+    max-width: 960px;
+    margin: 32px auto;
+    padding: 0 24px;
+}
+
+footer {
+    max-width: 960px;
+    margin: 48px auto 32px;
+    padding: 16px 24px 0;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+}
+
+/*---- 見出し ----*/
+h1 {
+    font-size: 26px;
+    margin: 0 0 20px;
+}
+
+h2 {
+    font-size: 19px;
+    margin: 28px 0 12px;
+}
+
+h2 a {
+    text-decoration: none;
+}
+
+h2 a:hover {
+    text-decoration: underline;
+}
+
+/*---- カード / 定義リスト ----*/
+article {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+}
+
+article h2 {
+    margin-top: 0;
+}
+
+dl {
+    margin: 0;
+}
+
+dt {
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 14px;
+}
+
+dd {
+    margin: 2px 0 0;
+}
+
+/*---- テーブル ----*/
+table {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    border-collapse: collapse;
+    overflow: hidden;
+    margin-bottom: 20px;
+}
+
+th,
+td {
+    text-align: left;
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-size: 15px;
+}
+
+th {
+    background: #f0f2f5;
+    font-size: 13px;
+    color: var(--muted);
+}
+
+tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/*---- フォーム ----*/
+.mb-3 {
+    margin-bottom: 18px;
+}
+
+.form-label {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.form-control,
+.form-select {
+    width: 100%;
+    max-width: 520px;
+    padding: 8px 11px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    font: inherit;
+    font-size: 15px;
+}
+
+.form-control:focus,
+.form-select:focus {
+    outline: 2px solid rgba(37, 99, 235, 0.35);
+    border-color: var(--primary);
+}
+
+textarea.form-control {
+    resize: vertical;
+}
+
+/*---- ボタン ----*/
+.btn {
+    display: inline-block;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 15px;
+    color: #fff;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background: var(--primary);
+}
+
+.btn-primary:hover {
+    background: #1d4ed8;
+}
+
+.btn-danger {
+    background: var(--danger);
+}
+
+.btn-danger:hover {
+    background: #b91c1c;
+}
+
+/*---- メッセージ ----*/
+.alert {
+    padding: 11px 16px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.alert-success {
+    background: #dcfce7;
+    border: 1px solid #86efac;
+    color: #166534;
+}
+
+.text-danger {
+    color: var(--danger);
+    font-size: 14px;
+    margin: 5px 0 0;
+}
+
+.text-muted {
+    color: var(--muted);
+}
+
+/*---- ページネーション（Bootstrap形式の出力に対応）----*/
+.d-flex {
+    display: flex;
+}
+
+.d-none {
+    display: none;
+}
+
+.d-sm-flex {
+    display: flex;
+}
+
+.d-sm-none {
+    display: none;
+}
+
+.justify-content-between,
+.justify-content-sm-between {
+    justify-content: space-between;
+}
+
+.align-items-sm-center {
+    align-items: center;
+}
+
+.flex-sm-fill {
+    flex: 1 1 auto;
+}
+
+.small {
+    font-size: 13px;
+}
+
+.fw-semibold {
+    font-weight: 600;
+}
+
+.pagination {
+    display: flex;
+    gap: 4px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.page-link {
+    display: block;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--primary);
+    text-decoration: none;
+    font-size: 14px;
+}
+
+.page-link:hover {
+    background: #eef2ff;
+}
+
+.page-item.active .page-link {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.page-item.disabled .page-link {
+    color: #9ca3af;
+    background: #f3f4f6;
+}
