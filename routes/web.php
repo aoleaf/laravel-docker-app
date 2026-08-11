@@ -1,7 +1,25 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PostController;
+use App\Http\Controllers\ProductController;
+use App\Http\Controllers\EventController;
+use App\Http\Controllers\ReservationController;
 
+// 基本的なルート（GETリクエストで / にアクセスしたら welcome ビューを返す）
 Route::get('/', function () {
     return view('welcome');
 });
+
+// RESTfulなリソースルート（CRUD全て）
+Route::resource('posts', PostController::class);
+Route::resource('products', ProductController::class);
+
+// イベントは閲覧のみ（登録はシーダー）
+Route::resource('events', EventController::class)->only(['index', 'show']);
+
+// 予約：作成はイベント配下、一覧とキャンセルは単独
+Route::get('events/{event}/reservations/create', [ReservationController::class, 'create'])->name('reservations.create');
+Route::post('events/{event}/reservations', [ReservationController::class, 'store'])->name('reservations.store');
+Route::get('reservations', [ReservationController::class, 'index'])->name('reservations.index');
+Route::delete('reservations/{reservation}', [ReservationController::class, 'destroy'])->name('reservations.destroy');
