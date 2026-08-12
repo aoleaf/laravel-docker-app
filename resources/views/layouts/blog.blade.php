@@ -9,6 +9,9 @@
         <nav>
             <a href="/">ホーム</a>
             <a href="/posts">投稿一覧</a>
+            @auth
+                <a href="/tasks">タスク一覧</a>
+            @endauth
             <a href="/products">商品一覧</a>
             <a href="/events">イベント一覧</a>
             <a href="/reservations">予約一覧</a>

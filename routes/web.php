@@ -6,6 +6,7 @@ use App\Http\Controllers\PostController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ReservationController;
+use App\Http\Controllers\TaskController;
 
 // 基本的なルート（GETリクエストで / にアクセスしたら welcome ビューを返す）
 Route::get('/', function () {
@@ -29,6 +30,13 @@ Route::resource('posts', PostController::class)
     ->except(['index', 'show'])
     ->middleware('auth');
 Route::resource('posts', PostController::class)->only(['index', 'show']);
+
+// タスク：全て自分のものだけ。未ログインは一切触れない
+Route::middleware('auth')->group(function () {
+    Route::patch('tasks/{task}/complete', [TaskController::class, 'complete'])->name('tasks.complete');
+    Route::patch('tasks/{task}/reopen', [TaskController::class, 'reopen'])->name('tasks.reopen');
+    Route::resource('tasks', TaskController::class);
+});
 
 // RESTfulなリソースルート（CRUD全て）
 Route::resource('products', ProductController::class);
