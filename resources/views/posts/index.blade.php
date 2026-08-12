@@ -1,11 +1,15 @@
-@extends('layouts.app')
+@extends('layouts.blog')
 
 @section('title', '投稿一覧')
 
 @section('content')
     <h1>投稿一覧</h1>
 
-    <a href="{{ route('posts.create') }}">新規投稿</a>
+    @auth
+        <a href="{{ route('posts.create') }}">新規投稿</a>
+    @else
+        <p><a href="{{ route('login') }}">ログイン</a>すると投稿できます</p>
+    @endauth
 
     @forelse ($posts as $post)
         <article>
@@ -15,7 +19,12 @@
                 </a>
             </h2>
             <p>{{ Str::limit($post->content, 100) }}</p>
-            <small>{{ $post->created_at->format('Y年m月d日') }}</small>
+            <small>
+                {{ $post->user->name }} / {{ $post->created_at->format('Y年m月d日') }}
+                @if ($post->isOwnedBy(auth()->user()))
+                    <a href="{{ route('posts.edit', $post) }}">編集</a>
+                @endif
+            </small>
         </article>
     @empty
         <p>投稿がありません</p>
