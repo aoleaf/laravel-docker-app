@@ -17,9 +17,15 @@ class DatabaseSeeder extends Seeder
     {
         // User::factory(10)->create();
 
+        // 認可の確認用に2人分（パスワードはどちらも password）
         User::factory()->create([
             'name' => 'Test User',
             'email' => 'test@example.com',
+        ]);
+
+        User::factory()->create([
+            'name' => 'Other User',
+            'email' => 'other@example.com',
         ]);
 
         $this->call([

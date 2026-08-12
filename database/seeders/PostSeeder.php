@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Post;
+use App\Models\User;
 use Illuminate\Database\Seeder;
 
 class PostSeeder extends Seeder
@@ -13,6 +14,9 @@ class PostSeeder extends Seeder
     public function run(): void
     {
         $categories = ['技術', '日記', '雑記'];
+
+        // 投稿を2人のユーザーに振り分ける
+        $userIds = User::orderBy('id')->pluck('id')->all();
 
         $titles = [
             'Laravel のルーティングを整理する',
@@ -37,6 +41,7 @@ class PostSeeder extends Seeder
 
             // forceCreate: $fillable を無視して created_at も入れる（投稿日をばらけさせるため）
             Post::forceCreate([
+                'user_id' => $userIds[$i % count($userIds)],
                 'title' => $title,
                 'content' => "これはシーダーで作成したサンプル投稿です。\n\n"
                     . "「{$title}」について調べたことをまとめました。"

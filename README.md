@@ -2,6 +2,7 @@
 
 Laravel 12 + Docker で構築した学習用 Web アプリケーションです。
 MVC パターンの練習として、**ブログ**・**商品管理**・**イベント予約** の3つのシステムを実装しています。
+ブログは Laravel Breeze による認証を組み込んだ **会員制ブログ** になっています。
 
 Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できるため、ローカルに PHP や MySQL を入れなくても `docker compose up -d` だけで開発環境が立ち上がります。
 
@@ -18,21 +19,57 @@ Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できる�
 
 ## 実装機能
 
-### 1. ブログシステム
+### 1. 認証（Laravel Breeze）
 
-投稿の CRUD を一通り備えたシンプルなブログです。
+`laravel/breeze`（Blade スタック）で導入しています。
+
+| 機能 | URL | 説明 |
+| --- | --- | --- |
+| ユーザー登録 | `/register` | 名前・メール・パスワード。パスワードは bcrypt でハッシュ化して保存 |
+| ログイン | `/login` | 失敗が続くとレートリミット（`LoginRequest` の `RateLimiter`、5回で一時ロック） |
+| ログアウト | `POST /logout` | セッションを無効化し、トークンを再生成 |
+| パスワードリセット | `/forgot-password` | メール経由での再設定 |
+| プロフィール編集 | `/profile` | 名前・メール・パスワードの変更、退会 |
+| ダッシュボード | `/dashboard` | ログイン後の画面 |
+
+### 2. 会員制ブログ
+
+投稿の CRUD に、認証（誰か）と認可（自分の投稿か）を組み合わせています。
 
 | 機能 | 説明 |
 | --- | --- |
-| 投稿一覧 | 新しい順に表示。1ページ10件のページネーション付き |
-| 投稿詳細 | 本文の改行を保持して表示（XSS 対策済み） |
-| 投稿作成 | タイトル・内容・カテゴリーを入力 |
-| 投稿編集 | 既存の値をフォームに復元して更新 |
-| 投稿削除 | 確認ダイアログを挟んで削除 |
+| 投稿一覧 | 新しい順に表示。1ページ10件のページネーション付き。**未ログインでも閲覧可** |
+| 投稿詳細 | 本文の改行を保持して表示（XSS 対策済み）。**未ログインでも閲覧可** |
+| 投稿作成 | **ログイン必須**。作者は `auth()->user()->posts()->create()` で自動的に自分になる |
+| 投稿編集 | **作者本人のみ**。他人の投稿を開こうとすると 403 |
+| 投稿削除 | **作者本人のみ**。確認ダイアログを挟んで削除 |
+| ボタンの出し分け | 編集・削除リンクは作者本人にだけ表示（表示制御とは別にサーバー側でも 403 チェック） |
 | バリデーション | 必須・文字数チェック。エラー時は入力値を保持したまま差し戻し |
-| レイアウト継承 | `layouts/app.blade.php` を全画面で `@extends` |
+| レイアウト継承 | `layouts/blog.blade.php` を全画面で `@extends`。ヘッダーにログイン状態を表示 |
 
-### 2. 商品管理システム
+アクセス制御は「ルート（ミドルウェア）」と「コントローラー」の2段構えです。
+
+```php
+// routes/web.php ── 閲覧は誰でも、書き込み系はログイン必須
+Route::resource('posts', PostController::class)
+    ->except(['index', 'show'])
+    ->middleware('auth');
+Route::resource('posts', PostController::class)->only(['index', 'show']);
+```
+
+```php
+// PostController.php ── ログインしていても「他人の投稿」なら弾く
+private function authorizeOwner(Post $post): void
+{
+    if (! $post->isOwnedBy(auth()->user())) {
+        abort(403, 'この操作は許可されていません');
+    }
+}
+```
+
+> `create` を含むルートを先に登録しています。`show`（`posts/{post}`）を先に書くと `/posts/create` が `{post}` に吸われてしまうためです。
+
+### 3. 商品管理システム
 
 数値項目と選択式カテゴリーを扱う商品マスタです。
 
@@ -46,9 +83,9 @@ Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できる�
 | カテゴリー制限 | モデル定数 `Product::CATEGORIES` の5種からのみ選択可能 |
 | 任意項目 | 説明は未入力でも登録可（`nullable`） |
 
-### 3. イベント予約システム
+### 4. イベント予約システム
 
-**テーブル間のリレーション**を扱う、3つの中で最も複雑なシステムです。
+**テーブル間のリレーション**を扱う、最も複雑なシステムです。
 
 | 機能 | 説明 |
 | --- | --- |
@@ -66,12 +103,21 @@ Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できる�
 
 ## 画面一覧
 
+| URL | 機能 | ログイン |
+| --- | --- | --- |
+| `/register` | ユーザー登録 | 不要 |
+| `/login` | ログイン | 不要 |
+| `/dashboard` | ダッシュボード | **必須** |
+| `/profile` | プロフィール編集 | **必須** |
+| `/posts` | 投稿一覧 | 不要 |
+| `/posts/{id}` | 投稿詳細 | 不要 |
+| `/posts/create` | 投稿作成フォーム | **必須** |
+| `/posts/{id}/edit` | 投稿編集フォーム | **必須（作者本人のみ）** |
+
+その他の画面（ログイン不要）。
+
 | URL | 機能 |
 | --- | --- |
-| `/posts` | 投稿一覧 |
-| `/posts/create` | 投稿作成フォーム |
-| `/posts/{id}` | 投稿詳細 |
-| `/posts/{id}/edit` | 投稿編集フォーム |
 | `/products` | 商品一覧 |
 | `/products/create` | 商品登録フォーム |
 | `/products/{id}` | 商品詳細 |
@@ -83,112 +129,97 @@ Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できる�
 
 ---
 
-## テーブル定義
+## DB設計
 
-### posts（投稿）
+テーブル定義（users / posts / products / events / reservations）と ER 図は
+**[docs/database.md](docs/database.md)** にまとめています。
 
-| カラム | 型 | NULL | 既定値 | 説明 |
-| --- | --- | --- | --- | --- |
-| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
-| title | varchar(200) | NO | | タイトル |
-| content | text | NO | | 本文 |
-| category | varchar(100) | NO | | カテゴリー |
-| created_at | timestamp | YES | NULL | 作成日時 |
-| updated_at | timestamp | YES | NULL | 更新日時 |
+投稿は `posts.user_id` で作者と紐づいており、`users` を削除すると
+`ON DELETE CASCADE` でその人の投稿も削除されます。
 
-### products（商品）
+---
 
-| カラム | 型 | NULL | 既定値 | 説明 |
-| --- | --- | --- | --- | --- |
-| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
-| name | varchar(100) | NO | | 商品名 |
-| price | int unsigned | NO | | 価格（円） |
-| description | text | YES | NULL | 説明（任意） |
-| stock | int unsigned | NO | 0 | 在庫数 |
-| category | varchar(50) | NO | | カテゴリー（食品 / 衣料品 / 家電 / 書籍 / その他） |
-| created_at | timestamp | YES | NULL | 作成日時 |
-| updated_at | timestamp | YES | NULL | 更新日時 |
+## セキュリティ対策
 
-### events（イベント）
+実際にリクエストを投げて検証した結果は **[docs/security-report.md](docs/security-report.md)** にまとめています。
 
-| カラム | 型 | NULL | 既定値 | 説明 |
-| --- | --- | --- | --- | --- |
-| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
-| title | varchar(200) | NO | | イベント名 |
-| description | text | YES | NULL | 詳細説明 |
-| venue | varchar(100) | NO | | 会場 |
-| starts_at | datetime | NO | | 開催日時 |
-| capacity | int unsigned | NO | | 定員 |
-| created_at | timestamp | YES | NULL | 作成日時 |
-| updated_at | timestamp | YES | NULL | 更新日時 |
+| 攻撃 | 対策 | 実装箇所 |
+| --- | --- | --- |
+| **XSS** | Blade の `{{ }}` による自動エスケープ。改行を活かす箇所も `e()` でエスケープしてから `nl2br()` に渡している | `posts/show.blade.php` の `{!! nl2br(e($post->content)) !!}` |
+| **CSRF** | 全ての POST / PUT / DELETE フォームに `@csrf`。トークンなしのリクエストは 419 で拒否 | 各 Blade フォーム、`VerifyCsrfToken` ミドルウェア |
+| **SQL インジェクション** | Eloquent / クエリビルダーのみを使用（生 SQL の文字列結合なし）。内部でプリペアドステートメントが使われる | 全コントローラー |
+| **パスワード漏洩** | `User` モデルの `casts` に `'password' => 'hashed'` を指定し、bcrypt でハッシュ化して保存。`$hidden` で JSON 出力からも除外 | `app/Models/User.php` |
+| **なりすまし投稿** | `Post` の `$fillable` に `user_id` を含めず、`auth()->user()->posts()->create()` で作者を決定。フォームに `user_id` を混ぜても無視される | `app/Models/Post.php`、`PostController@store` |
+| **他人の投稿の改ざん** | `edit` / `update` / `destroy` で作者を照合し、不一致なら `abort(403)` | `PostController@authorizeOwner` |
+| **未認証アクセス** | 書き込み系ルートを `auth` ミドルウェアで保護。未ログインは `/login` へリダイレクト | `routes/web.php` |
+| **ブルートフォース** | ログイン試行のレートリミット（5回失敗で一時ロック） | `app/Http/Requests/Auth/LoginRequest.php` |
+| **セッション固定化** | ログイン時に `session()->regenerate()`、ログアウト時に `invalidate()` + `regenerateToken()` | `AuthenticatedSessionController` |
+| **機密情報のコミット** | `.env` は `.gitignore` 済み。共有用に `.env.example` のみコミット | `.gitignore` |
 
-### reservations（予約）
+### 自動テスト
 
-| カラム | 型 | NULL | 既定値 | 説明 |
-| --- | --- | --- | --- | --- |
-| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
-| event_id | bigint unsigned | NO | | 外部キー → `events.id`（ON DELETE CASCADE） |
-| name | varchar(100) | NO | | 予約者名 |
-| email | varchar(255) | NO | | メールアドレス |
-| number_of_people | int unsigned | NO | | 人数 |
-| reserved_at | datetime | NO | | 予約日時 |
-| created_at | timestamp | YES | NULL | 作成日時 |
-| updated_at | timestamp | YES | NULL | 更新日時 |
+`tests/Feature/PostAuthorizationTest.php` に、上記のうち検証可能なものをテストとして落としています。
 
-### リレーション
-
-```mermaid
-erDiagram
-    events ||--o{ reservations : "1対多"
-    events {
-        bigint id PK
-        string title
-        string venue
-        datetime starts_at
-        int capacity
-    }
-    reservations {
-        bigint id PK
-        bigint event_id FK
-        string name
-        string email
-        int number_of_people
-        datetime reserved_at
-    }
+```bash
+docker compose exec app php artisan test --filter=PostAuthorizationTest
 ```
 
-`events` 1件に対して `reservations` が複数紐づきます。
-`ON DELETE CASCADE` を設定しているため、イベントを削除すると関連する予約も自動的に削除されます。
+| テスト | 確認内容 |
+| --- | --- |
+| ゲストでも一覧と詳細は見られる | 公開ルートが 200 |
+| ゲストは投稿フォームにアクセスできない | `/posts/create` が `/login` へリダイレクト |
+| ゲストは投稿を保存できない | POST が弾かれ、DB に保存されない |
+| ログインユーザーは投稿でき作者が自分になる | `user_id` にログインユーザーが入る |
+| `user_id` を送りつけても作者を偽装できない | 一括代入対策 |
+| 他人の投稿は編集画面を開けない / 更新できない / 削除できない | いずれも 403、DB も変化なし |
+| 自分の投稿は更新できる / 削除できる | 正常系 |
+| 投稿フォームに CSRF トークンが埋め込まれている | `name="_token"` の存在 |
+| 投稿内容のスクリプトタグはエスケープされる | `<script>` がそのまま出力されない |
+| SQL インジェクションを試みても全件は漏れない | `1' OR '1'='1` が 404 |
 
-Eloquent 側では以下のように定義しています。
-
-```php
-// Event.php
-public function reservations(): HasMany
-{
-    return $this->hasMany(Reservation::class);
-}
-
-// Reservation.php
-public function event(): BelongsTo
-{
-    return $this->belongsTo(Event::class);
-}
-```
+> CSRF 検証そのものはテスト実行中スキップされる仕様（`ValidateCsrfToken::runningUnitTests()`）のため、419 になることは curl で確認しています。
+>
+> ```bash
+> curl -i -X POST http://localhost/posts -d "title=a&content=b&category=c"   # → 419
+> ```
 
 ---
 
 ## スクリーンショット
 
-### ブログシステム
+### 認証
 
-| 投稿一覧 | 投稿作成フォーム |
+| ログイン | ユーザー登録 |
 | --- | --- |
-| ![投稿一覧](docs/screenshots/blog-index.png) | ![投稿作成](docs/screenshots/blog-create.png) |
+| ![ログイン](docs/screenshots/auth-login.png) | ![ユーザー登録](docs/screenshots/auth-register.png) |
 
-| 投稿詳細 | バリデーションエラー |
+| ダッシュボード |
+| --- |
+| ![ダッシュボード](docs/screenshots/auth-dashboard.png) |
+
+### 会員制ブログ
+
+未ログインでも一覧・詳細は読めますが、「新規投稿」は出ず、代わりにログインへの導線が出ます。
+
+| 未ログインの投稿一覧 | ログイン後の投稿一覧 |
 | --- | --- |
-| ![投稿詳細](docs/screenshots/blog-show.png) | ![バリデーション](docs/screenshots/blog-validation.png) |
+| ![未ログインの一覧](docs/screenshots/blog-index-guest.png) | ![ログイン後の一覧](docs/screenshots/blog-index.png) |
+
+ログイン後の一覧では、**自分（Test User）の投稿にだけ「編集」リンク**が出ています。Other User の投稿には出ません。
+
+| 自分の投稿の詳細 | 他人の投稿の詳細 |
+| --- | --- |
+| ![自分の投稿](docs/screenshots/blog-show-own.png) | ![他人の投稿](docs/screenshots/blog-show-other.png) |
+
+編集・削除ボタンは作者本人にだけ表示されます。URL を直接叩いても、サーバー側のチェックで 403 になります。
+
+| 他人の投稿の編集URLに直接アクセス |
+| --- |
+| ![403](docs/screenshots/blog-403.png) |
+
+| 投稿作成フォーム | バリデーションエラー |
+| --- | --- |
+| ![投稿作成](docs/screenshots/blog-create.png) | ![バリデーション](docs/screenshots/blog-validation.png) |
 
 ### 商品管理システム
 
@@ -260,7 +291,21 @@ docker compose exec app chown -R www-data:www-data storage bootstrap/cache
 docker compose exec app chmod -R 775 storage bootstrap/cache
 ```
 
-### 5. テーブル作成とサンプルデータ投入
+### 5. フロントエンドアセットのビルド（ホストPCで実行）
+
+Breeze の画面（ログイン・登録・プロフィール）は Tailwind CSS を使うため、Vite でのビルドが必要です。
+`app` コンテナに Node.js は入っていないので、**ホストPC側**のプロジェクトルートで実行します。
+
+```bash
+node -v          # 入っていなければ https://nodejs.org からインストール
+npm install
+npm run build    # 開発中は npm run dev でもOK（ホットリロード）
+```
+
+> ビルドしていないと `/login` などで `Vite manifest not found` エラーになります。
+> `/posts` 系の画面は `public/css/app.css` を直接読み込んでいるため、ビルドなしでも表示されます。
+
+### 6. テーブル作成とサンプルデータ投入
 
 ```bash
 docker compose exec app php artisan migrate --seed
@@ -270,16 +315,31 @@ docker compose exec app php artisan migrate --seed
 
 | データ | 件数 | 内容 |
 | --- | --- | --- |
-| 投稿 | 15件 | ページネーションの確認用 |
+| ユーザー | 2件 | 認可（他人の投稿は編集できない）の確認用 |
+| 投稿 | 15件 | 2人のユーザーに交互に割り当て。ページネーションの確認用 |
 | 商品 | 15件 | 在庫切れ商品を2件含む |
 | イベント | 3件 | 定員 30 / 100 / 5 名。定員5名は定員オーバーの確認用 |
 
-### 6. 動作確認
+| ログイン用アカウント | パスワード |
+| --- | --- |
+| test@example.com | password |
+| other@example.com | password |
+
+### 7. 動作確認
 
 | URL | 内容 |
 | --- | --- |
 | http://localhost | アプリケーション |
+| http://localhost/posts | 会員制ブログ |
+| http://localhost/login | ログイン |
 | http://localhost:8080 | phpMyAdmin（root / secret） |
+
+「自分の投稿だけ編集・削除できる」ことは、以下の手順で確認できます。
+
+1. `test@example.com` でログインし、`/posts` を開く
+2. 自分の投稿にだけ「編集」リンクが出ることを確認
+3. 他人（Other User）の投稿の詳細を開き、編集・削除ボタンが**出ない**ことを確認
+4. URL を直接叩いて `/posts/{他人の投稿のid}/edit` にアクセス → **403** になることを確認
 
 ---
 

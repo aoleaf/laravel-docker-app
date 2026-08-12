@@ -44,6 +44,14 @@ return [
             'transaction_mode' => 'DEFERRED',
         ],
 
+        // テスト専用。コンテナの DB_DATABASE=laravel に引きずられないよう env() を使わない
+        'testing' => [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => true,
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

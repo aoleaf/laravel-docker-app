@@ -23,8 +23,14 @@ Route::middleware('auth')->group(function () {
 });
 
 
+// 投稿：閲覧は誰でも、作成・編集・削除はログイン必須
+// create を先に登録しないと /posts/create が show の {post} に吸われる
+Route::resource('posts', PostController::class)
+    ->except(['index', 'show'])
+    ->middleware('auth');
+Route::resource('posts', PostController::class)->only(['index', 'show']);
+
 // RESTfulなリソースルート（CRUD全て）
-Route::resource('posts', PostController::class);
 Route::resource('products', ProductController::class);
 
 // イベントは閲覧のみ（登録はシーダー）

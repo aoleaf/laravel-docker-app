@@ -12,6 +12,19 @@
             <a href="/products">商品一覧</a>
             <a href="/events">イベント一覧</a>
             <a href="/reservations">予約一覧</a>
+
+            <span class="nav-auth">
+                @auth
+                    <span class="nav-user">{{ auth()->user()->name }} さん</span>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit">ログアウト</button>
+                    </form>
+                @else
+                    <a href="{{ route('login') }}">ログイン</a>
+                    <a href="{{ route('register') }}">新規登録</a>
+                @endauth
+            </span>
         </nav>
     </header>
 

@@ -10,7 +10,7 @@ class PostController extends Controller
     // 一覧表示
     public function index()
     {
-        $posts = Post::latest()->paginate(10);
+        $posts = Post::with('user')->latest()->paginate(10);
         return view('posts.index', compact('posts'));
     }
 
@@ -28,14 +28,15 @@ class PostController extends Controller
             'content' => 'required',
             'category' => 'required|max:50',
         ]);
-        $post = Post::create($validated);
+        // ログインユーザー経由で作成すると user_id が自動で入る
+        $post = $request->user()->posts()->create($validated);
         return redirect()->route('posts.show', $post)->with('success', '投稿を作成しました');
     }
 
     // show
     public function show($id)
     {
-        $post = Post::findOrFail($id);
+        $post = Post::with('user')->findOrFail($id);
         return view('posts.show', compact('post'));
     }
 
@@ -43,6 +44,8 @@ class PostController extends Controller
     public function edit($id)
     {
         $post = Post::findOrFail($id);
+        $this->authorizeOwner($post);
+
         return view('posts.edit', compact('post'));
     }
 
@@ -55,6 +58,7 @@ class PostController extends Controller
             'category' => 'required|max:50',
         ]);
         $post = Post::findOrFail($id);
+        $this->authorizeOwner($post);
         $post->update($validated);
 
         return redirect()
@@ -66,10 +70,19 @@ class PostController extends Controller
     public function destroy($id)
     {
         $post = Post::findOrFail($id);
+        $this->authorizeOwner($post);
         $post->delete();
 
         return redirect()
             ->route('posts.index')
             ->with('success', '投稿を削除しました');
+    }
+
+    // 投稿の作者本人でなければ403（Week9でPolicyに置き換える）
+    private function authorizeOwner(Post $post): void
+    {
+        if (! $post->isOwnedBy(auth()->user())) {
+            abort(403, 'この操作は許可されていません');
+        }
     }
 }
