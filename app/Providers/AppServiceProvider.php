@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Repositories\EloquentTaskRepository;
+use App\Repositories\TaskRepositoryInterface;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 
@@ -12,7 +14,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // TaskRepositoryInterface を要求されたら EloquentTaskRepository を渡す
+        $this->app->bind(TaskRepositoryInterface::class, EloquentTaskRepository::class);
     }
 
     /**

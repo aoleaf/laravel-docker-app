@@ -29,6 +29,26 @@ Breeze が生成したマイグレーションのままです。
 | created_at | timestamp | YES | NULL | 作成日時 |
 | updated_at | timestamp | YES | NULL | 更新日時 |
 
+## tasks（タスク）
+
+| カラム | 型 | NULL | 既定値 | 説明 |
+| --- | --- | --- | --- | --- |
+| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
+| user_id | bigint unsigned | NO | | 外部キー → `users.id`（ON DELETE CASCADE）。タスクの所有者 |
+| title | varchar(200) | NO | | タイトル |
+| description | text | YES | NULL | 詳細 |
+| status | varchar(20) | NO | `'todo'` | 状態。`App\Enums\TaskStatus`（todo / doing / done） |
+| due_date | date | YES | NULL | 期限。NULL は期限なし |
+| completed_at | timestamp | YES | NULL | 完了日時。`status = done` と必ずセットで更新される |
+| created_at | timestamp | YES | NULL | 作成日時 |
+| updated_at | timestamp | YES | NULL | 更新日時 |
+
+インデックス：`(user_id, status)` の複合インデックス。
+一覧が常に「自分のタスクを状態で絞る」アクセスパターンになるためです。
+
+> `status` と `completed_at` の整合性はアプリ側（`TaskService::complete()` / `reopen()`）で担保しています。
+> 汎用の `update()` はこの2カラムを受け付けないため、「完了なのに `completed_at` が NULL」にはなりません。
+
 ## products（商品）
 
 | カラム | 型 | NULL | 既定値 | 説明 |
@@ -75,6 +95,7 @@ Breeze が生成したマイグレーションのままです。
 ```mermaid
 erDiagram
     users ||--o{ posts : "1対多"
+    users ||--o{ tasks : "1対多"
     events ||--o{ reservations : "1対多"
     users {
         bigint id PK
@@ -88,6 +109,15 @@ erDiagram
         string title
         text content
         string category
+    }
+    tasks {
+        bigint id PK
+        bigint user_id FK
+        string title
+        text description
+        string status
+        date due_date
+        timestamp completed_at
     }
     events {
         bigint id PK
@@ -106,8 +136,8 @@ erDiagram
     }
 ```
 
-`users` 1件に対して `posts` が、`events` 1件に対して `reservations` が複数紐づきます。
-どちらも `ON DELETE CASCADE` なので、ユーザーを削除するとその投稿も一緒に消えます（退会機能で使われます）。
+`users` 1件に対して `posts` と `tasks` が、`events` 1件に対して `reservations` が複数紐づきます。
+いずれも `ON DELETE CASCADE` なので、ユーザーを削除するとその投稿とタスクも一緒に消えます（退会機能で使われます）。
 
 Eloquent 側では以下のように定義しています。
 
@@ -118,7 +148,18 @@ public function posts(): HasMany
     return $this->hasMany(Post::class);
 }
 
+public function tasks(): HasMany
+{
+    return $this->hasMany(Task::class);
+}
+
 // Post.php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+
+// Task.php
 public function user(): BelongsTo
 {
     return $this->belongsTo(User::class);

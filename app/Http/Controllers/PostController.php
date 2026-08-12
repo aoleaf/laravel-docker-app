@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\PostRequest;
 use App\Models\Post;
-use Illuminate\Http\Request;
+use App\Services\PostService;
 
 class PostController extends Controller
 {
+    public function __construct(
+        private PostService $postService,
+    ) {}
+
     // 一覧表示
     public function index()
     {
-        $posts = Post::with('user')->latest()->paginate(10);
+        $posts = $this->postService->list();
         return view('posts.index', compact('posts'));
     }
 
@@ -21,45 +26,35 @@ class PostController extends Controller
     }
 
     // データ保存
-    public function store(Request $request)
+    public function store(PostRequest $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|max:200',
-            'content' => 'required',
-            'category' => 'required|max:50',
-        ]);
-        // ログインユーザー経由で作成すると user_id が自動で入る
-        $post = $request->user()->posts()->create($validated);
-        return redirect()->route('posts.show', $post)->with('success', '投稿を作成しました');
+        $post = $this->postService->createFor($request->user(), $request->validated());
+
+        return redirect()
+            ->route('posts.show', $post)
+            ->with('success', '投稿を作成しました');
     }
 
-    // show
-    public function show($id)
+    // 詳細表示
+    public function show(Post $post)
     {
-        $post = Post::with('user')->findOrFail($id);
         return view('posts.show', compact('post'));
     }
 
-     // edit
-    public function edit($id)
+    // 編集フォーム
+    public function edit(Post $post)
     {
-        $post = Post::findOrFail($id);
-        $this->authorizeOwner($post);
+        $this->authorize('update', $post);
 
         return view('posts.edit', compact('post'));
     }
 
-     // update
-    public function update(Request $request, $id)
+    // データ更新
+    public function update(PostRequest $request, Post $post)
     {
-        $validated = $request->validate([
-            'title' => 'required|max:200',
-            'content' => 'required',
-            'category' => 'required|max:50',
-        ]);
-        $post = Post::findOrFail($id);
-        $this->authorizeOwner($post);
-        $post->update($validated);
+        $this->authorize('update', $post);
+
+        $this->postService->update($post, $request->validated());
 
         return redirect()
             ->route('posts.show', $post)
@@ -67,22 +62,14 @@ class PostController extends Controller
     }
 
     // データ削除
-    public function destroy($id)
+    public function destroy(Post $post)
     {
-        $post = Post::findOrFail($id);
-        $this->authorizeOwner($post);
-        $post->delete();
+        $this->authorize('delete', $post);
+
+        $this->postService->delete($post);
 
         return redirect()
             ->route('posts.index')
             ->with('success', '投稿を削除しました');
-    }
-
-    // 投稿の作者本人でなければ403（Week9でPolicyに置き換える）
-    private function authorizeOwner(Post $post): void
-    {
-        if (! $post->isOwnedBy(auth()->user())) {
-            abort(403, 'この操作は許可されていません');
-        }
     }
 }

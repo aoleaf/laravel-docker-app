@@ -21,9 +21,9 @@
             <p>{{ Str::limit($post->content, 100) }}</p>
             <small>
                 {{ $post->user->name }} / {{ $post->created_at->format('Y年m月d日') }}
-                @if ($post->isOwnedBy(auth()->user()))
+                @can('update', $post)
                     <a href="{{ route('posts.edit', $post) }}">編集</a>
-                @endif
+                @endcan
             </small>
         </article>
     @empty
