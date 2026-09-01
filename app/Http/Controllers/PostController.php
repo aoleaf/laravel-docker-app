@@ -28,7 +28,11 @@ class PostController extends Controller
     // データ保存
     public function store(PostRequest $request)
     {
-        $post = $this->postService->createFor($request->user(), $request->validated());
+        $post = $this->postService->createFor(
+            $request->user(),
+            $request->validated(),
+            $request->file('image'),
+        );
 
         return redirect()
             ->route('posts.show', $post)
@@ -54,7 +58,7 @@ class PostController extends Controller
     {
         $this->authorize('update', $post);
 
-        $this->postService->update($post, $request->validated());
+        $this->postService->update($post, $request->validated(), $request->file('image'));
 
         return redirect()
             ->route('posts.show', $post)

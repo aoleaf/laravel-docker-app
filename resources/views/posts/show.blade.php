@@ -6,6 +6,9 @@
     <article>
         <h1>{{ $post->title }}</h1>
         <p><small>{{ $post->user->name }} / {{ $post->category }} / {{ $post->created_at->format('Y年m月d日') }}</small></p>
+        @if ($post->image_url)
+            <img src="{{ $post->image_url }}" alt="" class="img-fluid mb-3" style="max-width: 600px;">
+        @endif
         <div>{!! nl2br(e($post->content)) !!}</div>
     </article>
 
