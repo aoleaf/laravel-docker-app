@@ -626,6 +626,26 @@ AWS_BUCKET=your-bucket-name
 > `AWS_DEFAULT_REGION` を書き忘れると `config/filesystems.php` が `.env.example` 由来の `us-east-1` を読み、
 > 東京リージョンのバケットに届かず `AccessDenied` になります。
 
+#### フロントエンドアセットについて
+
+`public/build/`（Vite のビルド成果物）は、ローカルでビルドして `git add -f` でコミットしています。
+`.gitignore` の対象ですが、EC2 上には Node.js が無く、clone しても存在しないためです。
+
+Breeze の `layouts/guest.blade.php` は `@vite()` でアセットを読むため、これが無いと
+`/login` `/register` が `Vite manifest not found` で 500 になります。
+
+EC2 上でビルドしない理由は2つです。t3.micro（メモリ1GB）では Vite のビルドが
+メモリ不足で失敗するリスクがあること、そして本番サーバーに Node と devDependencies を
+常駐させることになり「本番には動かすものだけを置く」原則に反することです。
+本来は CI でビルドし、成果物のみをデプロイするのが適切で、これは残課題です。
+
+```bash
+# ローカルで実行してコミットする
+npm ci
+npm run build
+git add -f public/build
+```
+
 ```bash
 docker compose -f docker-compose.prod.yml up -d --build
 docker compose -f docker-compose.prod.yml exec app composer install --no-dev --optimize-autoloader
@@ -654,6 +674,24 @@ docker compose -f docker-compose.prod.yml exec app php artisan config:cache
 `app` の `volumes`（`./:/var/www/html`）は残しています。EC2 上のリポジトリをそのままマウントし、
 そこへ `composer install` するためです。
 
+#### 残課題：コンテナの自動起動
+
+現状 `restart` ポリシーを設定していないため、EC2 を停止・再起動するとコンテナが停止したままになります。
+Docker デーモン自体は systemd で自動起動しますが、コンテナの復帰は別の話です。
+
+本番構成としては以下を追加すべきです。
+
+```yaml
+services:
+  nginx:
+    restart: always
+  app:
+    restart: always
+```
+
+「サーバーが再起動してもサービスが自動復帰するか」は、本番環境で当然考慮すべき点でした。
+
+
 ### 4. 詰まった点と対処
 
 | 事象 | 原因 | 対処 |
@@ -665,6 +703,8 @@ docker compose -f docker-compose.prod.yml exec app php artisan config:cache
 | 500 エラーだがログも出ない | `storage/` が `ubuntu` 所有で、`www-data` で動く PHP-FPM が**ログすら書けない** | `chown -R www-data:www-data storage bootstrap/cache` |
 | `db:seed` で `fake()` が undefined | `--no-dev` で `fakerphp/faker`（`require-dev`）が除外された | 本番ではシーダーを実行しない方針とした |
 | S3 が AccessDenied | `AWS_DEFAULT_REGION` が未設定で、`.env.example` 由来の `us-east-1` が使われていた | `.env` に `ap-northeast-1` を明記し `config:clear` |
+| `/login` `/register` だけ 500 になる | `layouts/guest.blade.php` が `@vite()` を使うが、`public/build/` は `.gitignore` 対象で clone に含まれない | ローカルでビルドし `git add -f public/build` でコミット |
+| EC2 再起動後にアプリが応答しない | コンテナに `restart` ポリシーを設定していないため、Docker デーモンは起動してもコンテナは復帰しない | 手動で `docker compose -f docker-compose.prod.yml up -d`。恒久対応は残課題（後述） |
 
 ---
 
@@ -804,6 +844,52 @@ ARN のリージョン欄とアカウント ID 欄が空になり、区切りの
 
 ルートユーザーを日常操作に使わず MFA を必須にしたのと同じ、
 **長期の認証情報を極力存在させない**という原則の延長線上にあります。
+
+---
+
+## リソースの削除
+
+学習用の環境のため、確認後は課金を止めるために削除します。**削除には順序があります。**
+
+### 1. S3
+
+バケットは**空でないと削除できません**。先に中身を削除します。
+
+1. S3 コンソール → バケットを選択 → 「空にする」
+2. その後「削除」
+
+### 2. RDS
+
+1. RDS コンソール → DB インスタンスを選択 → アクション → 「削除」
+2. 最終スナップショットの作成：**不要**（学習用のため）
+3. 削除保護が有効な場合は、先に「変更」から無効化する
+
+### 3. EC2
+
+1. インスタンスを選択 → インスタンスの状態 → **「インスタンスを終了（削除）」**
+2. 「停止」ではデータもディスクも残り、EBS の課金が継続する
+
+### 4. Elastic IP
+
+**ここが最も忘れやすく、忘れると課金が続きます。**
+
+1. Elastic IP → 対象を選択 → 「関連付けの解除」
+2. 続けて **「Elastic IP アドレスの解放」**
+
+Elastic IP は「インスタンスに関連付いている間は無料、未関連付けだと課金」という料金体系です。
+EC2 を削除すると自動的に未関連付けの状態になるため、**解放まで実行しないと課金され続けます**。
+関連付けの解除だけでは不十分です。
+
+### 5. セキュリティグループ（任意）
+
+`default` と `launch-wizard-*`、`ec2-rds-1` / `rds-ec2-1` が残ります。
+SG 自体に課金はありませんが、使われていないルールが残っていると、
+次に環境を作るときにどれが有効なのか分からなくなります。あわせて整理しておきます。
+
+### 6. IAM（任意）
+
+`laravel-s3-user` のアクセスキーは、使わなくなった時点で無効化・削除します。
+長期の認証情報を必要以上に存在させないためです。
 
 ---
 
