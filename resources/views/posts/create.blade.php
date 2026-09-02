@@ -5,7 +5,7 @@
 @section('content')
     <h1>新規投稿</h1>
 
-    <form method="POST" action="{{ route('posts.store') }}">
+    <form method="POST" action="{{ route('posts.store') }}" enctype="multipart/form-data">
         @csrf
         @include('posts._form', ['submitLabel' => '投稿する'])
     </form>

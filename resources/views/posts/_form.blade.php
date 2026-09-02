@@ -24,4 +24,18 @@
     @enderror
 </div>
 
+<div class="mb-3">
+    <label for="image" class="form-label">画像</label>
+    @if (!empty($post->image_url))
+        <div class="mb-2">
+            <img src="{{ $post->image_url }}" alt="" class="img-fluid" style="max-width: 200px;">
+        </div>
+    @endif
+    <input type="file" class="form-control" id="image" name="image" accept="image/*">
+    <div class="form-text">JPEG / PNG / WebP、2MBまで。選び直すと差し替わります。</div>
+    @error('image')
+        <p class="text-danger">{{ $message }}</p>
+    @enderror
+</div>
+
 <button type="submit" class="btn btn-primary">{{ $submitLabel ?? '保存' }}</button>

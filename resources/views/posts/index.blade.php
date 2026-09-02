@@ -18,6 +18,11 @@
                     {{ $post->title }}
                 </a>
             </h2>
+            @if ($post->image_url)
+                <a href="{{ route('posts.show', $post) }}">
+                    <img src="{{ $post->image_url }}" alt="" class="img-fluid" style="max-width: 240px;">
+                </a>
+            @endif
             <p>{{ Str::limit($post->content, 100) }}</p>
             <small>
                 {{ $post->user->name }} / {{ $post->created_at->format('Y年m月d日') }}
