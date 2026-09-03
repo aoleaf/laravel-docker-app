@@ -18,6 +18,8 @@ Docker で Nginx・PHP-FPM・MySQL・phpMyAdmin をまとめて起動できる�
 - phpMyAdmin
 - Docker / Docker Compose
 - AWS（EC2 / RDS for MySQL / S3 / IAM）
+- Stripe（Checkout / Webhook）
+- SendGrid（SMTP）
 
 ---
 
@@ -203,6 +205,28 @@ $this->app->bind(TaskRepositoryInterface::class, EloquentTaskRepository::class);
 
 > イベント自体の登録画面はありません。データはシーダー（`EventSeeder`）から投入します。
 
+### 6. Stripe決済 / SendGridメール送信
+
+外部APIとの連携。カード情報は Stripe がホストする決済ページで入力されるため、**自社サーバーを一切通りません**。
+
+| 機能 | 説明 |
+| --- | --- |
+| 決済開始 | 商品詳細の「この商品を購入する」で Checkout Session を作り、Stripe の決済ページへリダイレクト |
+| 決済完了 | `success_url` に戻ると完了ページを表示。テストカードは `4242 4242 4242 4242` |
+| 購入履歴 | `/purchases` に金額・ステータス・決済IDを一覧表示 |
+| **Webhook** | `POST /api/webhook/stripe` で `checkout.session.completed` を受信し、購入履歴を確定させる |
+| **署名検証** | `Webhook::constructEvent()` で `Stripe-Signature` を検証。偽装リクエストによる不正な注文確定を防ぐ |
+| **冪等性** | `purchases.stripe_session_id` のユニーク制約 + `updateOrCreate` で、同じイベントが再送されても1行のまま |
+| エラーハンドリング | `CardException` / `InvalidRequestException` / `ApiConnectionException` / `AuthenticationException` を個別に処理 |
+| ウェルカムメール | 会員登録時に SendGrid（SMTP）で送信。送信失敗はログに残し、登録処理自体は止めない |
+
+ブラウザのリダイレクト（`success_url`）はユーザーがタブを閉じると届かないため、
+**注文の確定は Webhook 側**に置いています。両方から同じ保存処理を呼びますが、上記の冪等性で二重登録になりません。
+
+APIキーは `.env` に置き、コードからは必ず `config('services.stripe.*')` 経由で参照します。
+
+理屈・教材との差分・セットアップ手順は **[docs/week12-stripe-sendgrid-note.md](docs/week12-stripe-sendgrid-note.md)** にまとめています。
+
 ---
 
 ## アーキテクチャ（Repository / Service / Policy）
@@ -280,6 +304,9 @@ before / after の詳細な比較、数値、トレードオフは
 | `/events/{id}` | イベント詳細 |
 | `/events/{id}/reservations/create` | 予約フォーム |
 | `/reservations` | 予約一覧 |
+| `/purchases` | 購入履歴 |
+| `/checkout/success` | 決済完了（Stripe からのリダイレクト先） |
+| `/checkout/cancel` | 決済キャンセル |
 
 ---
 
