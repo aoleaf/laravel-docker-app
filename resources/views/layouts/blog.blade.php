@@ -15,6 +15,7 @@
             <a href="/products">商品一覧</a>
             <a href="/events">イベント一覧</a>
             <a href="/reservations">予約一覧</a>
+            <a href="/purchases">購入履歴</a>
 
             <span class="nav-auth">
                 @auth
@@ -35,6 +36,12 @@
         @if (session('success'))
             <div class="alert alert-success">
                 {{ session('success') }}
+            </div>
+        @endif
+
+        @if (session('error'))
+            <div class="alert alert-danger">
+                {{ session('error') }}
             </div>
         @endif
 

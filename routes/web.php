@@ -7,6 +7,7 @@ use App\Http\Controllers\ProductController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\TaskController;
+use App\Http\Controllers\CheckoutController;
 
 // 基本的なルート（GETリクエストで / にアクセスしたら welcome ビューを返す）
 Route::get('/', function () {
@@ -40,6 +41,12 @@ Route::middleware('auth')->group(function () {
 
 // RESTfulなリソースルート（CRUD全て）
 Route::resource('products', ProductController::class);
+
+// Stripe決済：カード情報はStripeのページで入力されるので、ここには来ない
+Route::post('products/{product}/checkout', [CheckoutController::class, 'store'])->name('checkout.store');
+Route::get('checkout/success', [CheckoutController::class, 'success'])->name('checkout.success');
+Route::get('checkout/cancel', [CheckoutController::class, 'cancel'])->name('checkout.cancel');
+Route::get('purchases', [CheckoutController::class, 'index'])->name('purchases.index');
 
 // イベントは閲覧のみ（登録はシーダー）
 Route::resource('events', EventController::class)->only(['index', 'show']);
