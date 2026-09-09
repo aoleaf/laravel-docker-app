@@ -2,10 +2,13 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Product extends Model
 {
+    use HasFactory;
+
     // 選択できるカテゴリー（バリデーションとフォームの両方から参照）
     public const CATEGORIES = [
         '食品',

@@ -3,12 +3,15 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Mail\WelcomeMail;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Validation\Rules;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -43,6 +46,13 @@ class RegisteredUserController extends Controller
         ]);
 
         event(new Registered($user));
+
+        // SendGridが落ちていても登録自体は通す
+        try {
+            Mail::to($user->email)->send(new WelcomeMail($user));
+        } catch (\Throwable $e) {
+            Log::error('ウェルカムメール送信失敗', ['user_id' => $user->id, 'message' => $e->getMessage()]);
+        }
 
         Auth::login($user);
 

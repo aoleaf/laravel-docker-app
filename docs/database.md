@@ -88,6 +88,31 @@ Breeze が生成したマイグレーションのままです。
 | created_at | timestamp | YES | NULL | 作成日時 |
 | updated_at | timestamp | YES | NULL | 更新日時 |
 
+## purchases（購入履歴）
+
+Stripe Checkout の決済結果を保存します。
+
+| カラム | 型 | NULL | 既定値 | 説明 |
+| --- | --- | --- | --- | --- |
+| id | bigint unsigned | NO | AUTO_INCREMENT | 主キー |
+| stripe_session_id | varchar(255) | NO | | Checkout Session の ID（`cs_...`）。**UNIQUE** |
+| stripe_payment_intent_id | varchar(255) | YES | NULL | PaymentIntent の ID（`pi_...`） |
+| user_id | bigint unsigned | YES | NULL | 外部キー → `users.id`（ON DELETE SET NULL） |
+| product_id | bigint unsigned | YES | NULL | 外部キー → `products.id`（ON DELETE SET NULL） |
+| customer_email | varchar(255) | YES | NULL | 決済時のメールアドレス |
+| amount | int unsigned | NO | | 金額（JPY はゼロdecimal通貨なので円そのまま） |
+| currency | varchar(3) | NO | | 通貨コード（`jpy`） |
+| status | varchar(30) | NO | | Stripe の `payment_status`（`paid` など） |
+| created_at | timestamp | YES | NULL | 作成日時 |
+| updated_at | timestamp | YES | NULL | 更新日時 |
+
+`stripe_session_id` の UNIQUE が**冪等性の要**です。
+Stripe の Webhook は同じイベントを複数回配信し得るため、`updateOrCreate` の探索キーに使って
+2回目以降を UPDATE に倒し、重複行が生まれないようにしています。
+
+ユーザーや商品が削除されても購入履歴は帳簿として残す必要があるので、
+CASCADE ではなく `ON DELETE SET NULL` にしています。
+
 ---
 
 ## リレーション
@@ -97,6 +122,8 @@ erDiagram
     users ||--o{ posts : "1対多"
     users ||--o{ tasks : "1対多"
     events ||--o{ reservations : "1対多"
+    users ||--o{ purchases : "1対多"
+    products ||--o{ purchases : "1対多"
     users {
         bigint id PK
         string name
@@ -133,6 +160,23 @@ erDiagram
         string email
         int number_of_people
         datetime reserved_at
+    }
+    products {
+        bigint id PK
+        string name
+        int price
+        int stock
+        string category
+    }
+    purchases {
+        bigint id PK
+        string stripe_session_id UK
+        string stripe_payment_intent_id
+        bigint user_id FK
+        bigint product_id FK
+        int amount
+        string currency
+        string status
     }
 ```
 
@@ -175,5 +219,16 @@ public function reservations(): HasMany
 public function event(): BelongsTo
 {
     return $this->belongsTo(Event::class);
+}
+
+// Purchase.php
+public function user(): BelongsTo
+{
+    return $this->belongsTo(User::class);
+}
+
+public function product(): BelongsTo
+{
+    return $this->belongsTo(Product::class);
 }
 ```

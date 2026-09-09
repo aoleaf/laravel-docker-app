@@ -36,6 +36,14 @@
         </dl>
     </article>
 
+    {{-- 購入 --}}
+    @if (! $product->isOutOfStock())
+        <form method="POST" action="{{ route('checkout.store', $product) }}">
+            @csrf
+            <button type="submit">この商品を購入する</button>
+        </form>
+    @endif
+
     {{-- 操作 --}}
     <a href="{{ route('products.edit', $product) }}">編集</a>
 
