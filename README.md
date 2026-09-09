@@ -510,16 +510,12 @@ docker compose exec app php artisan migrate --seed
 
 ```
                 インターネット
-                      │ HTTPS :443（:80 は 301 リダイレクト）
+                      │ HTTP :80
                       ▼
         ┌──────────────────────────────┐
         │ EC2  Ubuntu 24.04 / t3.micro │  Elastic IP で固定
-        │                              │  aoleaf.com
-        │  Nginx（ホスト） :80 / :443  │  ← TLS 終端・リバースプロキシ
-        │       │ HTTP :8000           │
-        │       ▼  (127.0.0.1 のみ)    │
         │  docker-compose.prod.yml     │
-        │   ├─ nginx    :80            │  ← 静的配信・PHP-FPM への受け渡し
+        │   ├─ nginx    :80            │
         │   └─ app (PHP-FPM)           │
         └───────┬──────────────┬───────┘
         MySQL:3306              │ HTTPS
@@ -608,8 +604,7 @@ cp .env.example .env
 ```env
 APP_ENV=production
 APP_DEBUG=false
-APP_URL=https://aoleaf.com
-SESSION_SECURE_COOKIE=true
+APP_URL=http://<Elastic IP>
 
 DB_CONNECTION=mysql
 DB_HOST=<RDS のエンドポイント>
@@ -696,10 +691,6 @@ services:
 
 「サーバーが再起動してもサービスが自動復帰するか」は、本番環境で当然考慮すべき点でした。
 
-Week 13 でホストに Nginx と Certbot のタイマーを追加しましたが、これらは systemd 管理のため再起動後も自動復帰します。
-そのため EC2 を再起動すると **Nginx だけが動きコンテナが落ちている**状態になり、502 Bad Gateway が返ります。
-サイト全体が無反応だった以前と違い、HTTPS も証明書も正常に見えるぶん原因が分かりにくくなりました。
-
 
 ### 4. 詰まった点と対処
 
@@ -714,329 +705,6 @@ Week 13 でホストに Nginx と Certbot のタイマーを追加しました�
 | S3 が AccessDenied | `AWS_DEFAULT_REGION` が未設定で、`.env.example` 由来の `us-east-1` が使われていた | `.env` に `ap-northeast-1` を明記し `config:clear` |
 | `/login` `/register` だけ 500 になる | `layouts/guest.blade.php` が `@vite()` を使うが、`public/build/` は `.gitignore` 対象で clone に含まれない | ローカルでビルドし `git add -f public/build` でコミット |
 | EC2 再起動後にアプリが応答しない | コンテナに `restart` ポリシーを設定していないため、Docker デーモンは起動してもコンテナは復帰しない | 手動で `docker compose -f docker-compose.prod.yml up -d`。恒久対応は残課題（後述） |
-| `dig` がパーキングの IP を返す | DNS レコードは `01.dnsv.jp` に保存したが、ドメインのネームサーバーは初期値の `dns1.onamae.com` を向いたままだった | ネームサーバーを `01〜04.dnsv.jp` に変更 |
-| ネームサーバー変更後も EC2 だけ古い値を返す | NS レコードの TTL が 86400 で、AWS のリゾルバがキャッシュを保持していた | 外部からは正しく引けており Certbot の検証は Let's Encrypt 側から行われるため実害なし。確認時のみ `curl --resolve` で名前解決を上書き |
-| セキュリティグループのルール保存に失敗 | 説明欄にアポストロフィ（使用不可文字）を入れていた | 英数字のみに修正 |
-| `Unable to register an account with ACME server` | Certbot の利用規約への同意を `N` で答えた（EFF へのメール共有と混同） | 規約は `Y`、EFF 共有は `N` で再実行 |
-| www 用のリダイレクトが効かない | 既存 `server_name` から www を外し忘れ、後から追加したブロックが `conflicting server name ... ignored` で無視されていた | 既存ブロックから `www.aoleaf.com` を削除。`nginx -t` は successful でも warn は読む |
-
-DNS 関連の2件は、いずれも「DNS は誰に聞くかで答えが変わる」ことの実例でした。
-レジストラの管理画面上の表示・権威サーバーの応答・リゾルバのキャッシュは別のもので、切り分けには段階を踏む必要があります。
-
----
-
-## 独自ドメインと HTTPS 化
-
-Elastic IP で公開していたアプリケーションに独自ドメイン `https://aoleaf.com` を割り当て、
-Let's Encrypt の証明書で HTTPS 化しています。
-
-公開 URL: **https://aoleaf.com**
-
-### Nginx が2段になる理由
-
-この構成では Nginx が2つ動いています。役割が違うため、重複ではありません。
-
-| | 担当 |
-| --- | --- |
-| **ホストの Nginx**（Ubuntu / :80, :443） | TLS の終端、リバースプロキシ |
-| **コンテナの Nginx**（:80） | 静的ファイルの配信、PHP-FPM への受け渡し |
-
-```
-ブラウザ ──(443/TLS)──▶ ホスト Nginx ──(8000/平文)──▶ コンテナ Nginx ──▶ PHP-FPM
-```
-
-TLS の復号をホスト側の1箇所に集約することで、証明書の管理場所が1つで済み、
-後ろのアプリケーションは平文 HTTP のままでいられます。
-Certbot の Nginx プラグインもホスト側の設定ファイルだけを見ればよくなります。
-
-### 作業順序
-
-**DNS の反映が全ての前提**になるため、順序を守る必要があります。
-
-1. ドメイン取得
-2. DNS レコード設定 → `dig` で反映確認
-3. コンテナの公開ポートを 80 から 8000 へ付け替え
-4. ホストに Nginx を設置し、HTTP で疎通確認
-5. Certbot で証明書取得・HTTPS 化
-6. Laravel 側をプロキシ配下の設定に変更
-
-Certbot は Let's Encrypt 側が外部から `http://aoleaf.com/.well-known/...` へアクセスして
-ドメインの所有を検証します。DNS が正しく EC2 を指していない状態では必ず失敗します。
-
-### 1. ドメイン取得
-
-お名前.com で `aoleaf.com` を取得しました（初年度 0円 / 翌年以降 1,408円）。
-
-| 設定 | 理由 |
-| --- | --- |
-| Whois 情報公開代行を有効化 | 有効にしないと登録者の氏名・住所・電話番号が公開データベースに載る。**登録と同時なら無料**だが、後から申し込むと年 980円かかる |
-| 自動更新をオフ | 学習用のため1年で失効させる。初年度無料の TLD ほど翌年の更新料が高い |
-| レンタルサーバーのセット申込を外す | 「合計 0円」表示でも翌月から月額が発生する。アプリは EC2 で動いており不要 |
-
-`.dev` / `.app` は HSTS プリロードにより HTTP でアクセスできないため、
-途中の HTTP 疎通確認ができなくなります。今回は対象外としました。
-
-### 2. DNS レコード設定
-
-| ホスト名 | タイプ | 値 | TTL |
-| --- | --- | --- | --- |
-| （空欄 = ルート） | A | `<Elastic IP>` | 3600 |
-| www | CNAME | aoleaf.com | 3600 |
-
-`www` を CNAME にしているのは、Elastic IP を書き換えるときの修正箇所を A レコード1箇所に閉じ込めるためです。
-IP を2箇所に書くと、片方だけ直して不整合を起こします。
-
-### 3. コンテナの公開ポートの付け替え
-
-ホストに Nginx を入れる前に、80 番を空ける必要があります。
-
-```diff
-  nginx:
-    ports:
--     - "80:80"
-+     - "127.0.0.1:8000:80"
-```
-
-**`127.0.0.1:` を必ず付けます。** これを省くと 8000 番がインターネットから直接叩けてしまい、
-HTTPS を迂回して平文でアクセスできる経路が残ります。
-「443 を開ける」と同時に「8000 を閉じる」ことがセットです。
-
-```bash
-docker compose -f docker-compose.prod.yml up -d
-sudo ss -tlnp | grep :8000
-# LISTEN 0 4096 127.0.0.1:8000 0.0.0.0:* users:(("docker-proxy",...))
-#            ^^^^^^^^^ 0.0.0.0 ではなくループバックに閉じている
-```
-
-### 4. ホスト Nginx のリバースプロキシ設定
-
-実際の設定ファイル全文は [docs/nginx/myapp.conf](docs/nginx/myapp.conf) にあります（Certbot による自動生成部分を含む）。
-
-```nginx
-server {
-    listen 80;
-    server_name aoleaf.com www.aoleaf.com;
-
-    location / {
-        proxy_pass         http://localhost:8000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host $host;
-        proxy_set_header   X-Real-IP $remote_addr;
-        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header   X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-各ヘッダには役割があり、省くと具体的な不具合が出ます。
-
-| 行 | 省くとどうなるか |
-| --- | --- |
-| `proxy_http_version 1.1` | 上流へ HTTP/1.0 で接続する。keep-alive が効かず、将来 WebSocket の `Upgrade` も通せない |
-| `Host $host` | 上流に `Host: localhost:8000` が渡る。Laravel の `url()` / `route()` がこの値でリンクを生成するため、**全てのリンクが `http://localhost:8000/...` になる** |
-| `X-Real-IP` / `X-Forwarded-For` | アプリから見た接続元が Nginx（127.0.0.1）になり、本当のクライアント IP が失われる |
-| `X-Forwarded-Proto $scheme` | HTTPS 化後にアプリが「自分は http で呼ばれた」と誤認し、`asset()` が `http://` を返して mixed content でブロックされる |
-
-```bash
-sudo ln -s /etc/nginx/sites-available/myapp.conf /etc/nginx/sites-enabled/
-sudo rm /etc/nginx/sites-enabled/default   # デフォルトの welcome ページを無効化
-sudo nginx -t
-sudo systemctl reload nginx
-```
-
-**この時点で `http://aoleaf.com` がブラウザで開けることを確認してから** Certbot に進みます。
-ここが通らないまま実行しても、Certbot は必ず失敗します。
-
-### 5. Certbot による証明書取得
-
-```bash
-sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d aoleaf.com -d www.aoleaf.com
-```
-
-Nginx プラグインが設定ファイルを自動的に書き換え、以下を追加します。
-
-- 443 の `server` ブロック（証明書パス、TLS 設定）
-- 80 側の `return 301 https://$host$request_uri;`（HTTP → HTTPS リダイレクト）
-
-### 6. Laravel 側の設定
-
-TLS を終端するのはホスト Nginx で、コンテナには**平文 HTTP が届きます**。
-そのため Laravel は何もしなければ「自分は http で呼ばれた」と認識し続けます。
-
-Nginx は `X-Forwarded-Proto: https` を付けて転送していますが、
-このヘッダは誰でも偽装できるため、Laravel はデフォルトで信用しません。
-信頼するプロキシを明示して初めて、自分が HTTPS 配下にいると認識します。
-
-```php
-// bootstrap/app.php
-->withMiddleware(function (Middleware $middleware): void {
-    $middleware->trustProxies(at: '*');
-})
-```
-
-```env
-APP_URL=https://aoleaf.com
-SESSION_SECURE_COOKIE=true
-```
-
-`at: '*'`（全プロキシを信頼）は本来ゆるい設定ですが、
-8000 番を `127.0.0.1` に閉じているため、ホスト Nginx 以外からリクエストが到達する経路がありません。
-
-`SESSION_SECURE_COOKIE` は `.env.example` に無いので追記が必要です。
-これを入れると Cookie に `secure` 属性が付き、HTTPS でのみ送信されるようになります。
-
-```bash
-docker compose -f docker-compose.prod.yml exec app php artisan config:clear
-```
-
-### 7. www ありを www なしに統一
-
-Certbot は `aoleaf.com` と `www.aoleaf.com` を**同一の `server` ブロック**にまとめるため、
-初期状態では www 付きでもそのまま表示されます。同じ内容が2つの URL で見える状態です。
-
-既存ブロックから www を外し、リダイレクト専用のブロックを追加して分離します。
-
-```nginx
-server {
-    server_name aoleaf.com;          # ← www.aoleaf.com を削除
-    ...
-}
-
-server {
-    listen 443 ssl;
-    server_name www.aoleaf.com;
-
-    # 証明書に www も含まれているため同じパスを流用できる
-    ssl_certificate     /etc/letsencrypt/live/aoleaf.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/aoleaf.com/privkey.pem;
-    include             /etc/letsencrypt/options-ssl-nginx.conf;
-    ssl_dhparam         /etc/letsencrypt/ssl-dhparams.pem;
-
-    return 301 https://aoleaf.com$request_uri;
-}
-```
-
-リダイレクトだけを返すブロックにも `ssl_certificate` が必要です。
-**TLS ハンドシェイクが成立して初めて HTTP のレスポンスを返せる**ため、
-証明書が無ければリダイレクトを届ける前に接続が失敗します。
-
----
-
-## コマンドによる動作確認
-
-### `dig aoleaf.com +short`
-
-```
-13.230.58.143
-```
-
-ドメイン名を IPv4 アドレスに変換した結果（A レコードの値）です。
-EC2 に割り当てた Elastic IP と一致しており、名前解決が正しく設定されていることを示します。
-
-```
-$ dig www.aoleaf.com +short
-aoleaf.com.
-13.230.58.143
-```
-
-www 側は2行返ります。1行目が CNAME による別名の解決結果、2行目がその先の A レコードです。
-CNAME が正しく機能していることが、この2段の出力から確認できます。
-
-
-反映されない場合は、次の3段階で切り分けます。
-
-```bash
-dig aoleaf.com NS +short              # ドメインがどのネームサーバーを向いているか
-dig @01.dnsv.jp aoleaf.com A +short   # 権威サーバーに直接聞く（キャッシュを迂回）
-dig @8.8.8.8 aoleaf.com +short        # 外部のリゾルバから見た結果
-```
-
-上から順に、委任の設定・レコードの保存・キャッシュの状態を確認できます。
-
-### `curl -I https://aoleaf.com`
-
-```
-HTTP/1.1 200 OK
-Server: nginx/1.24.0 (Ubuntu)
-Content-Type: text/html; charset=utf-8
-Set-Cookie: XSRF-TOKEN=...; path=/; secure; samesite=lax
-Set-Cookie: laravel-session=...; path=/; secure; httponly; samesite=lax
-```
-
-| 項目 | 意味 |
-| --- | --- |
-| `HTTP/1.1 200 OK` | リクエスト成功。TLS ハンドシェイクも完了している（失敗していれば HTTP 応答自体が返らない） |
-| `Server: nginx/1.24.0 (Ubuntu)` | 応答しているのが**ホスト側**の Nginx であることが分かる。コンテナ内の Nginx は 1.31.4 なので、2段構成のどちらが返しているか判別できる |
-| `Content-Type: text/html; charset=utf-8` | 返却内容が HTML、文字コードが UTF-8 |
-| `secure` | HTTPS 接続でのみ送信される Cookie。`SESSION_SECURE_COOKIE=true` の効果 |
-| `httponly` | JavaScript から読めない Cookie。XSS でセッションを盗まれることを防ぐ |
-
-HTTP 側も確認します。
-
-```
-$ curl -I http://aoleaf.com
-HTTP/1.1 301 Moved Permanently
-Location: https://aoleaf.com/
-```
-
-`301` は恒久的な移転を示すステータスコードで、ブラウザや検索エンジンは以後 HTTPS を使います。
-`Location` が転送先です。HTTP → HTTPS の自動リダイレクトが機能しています。
-
-```
-$ curl -I https://www.aoleaf.com
-HTTP/1.1 301 Moved Permanently
-Location: https://aoleaf.com/
-```
-
-www ありも www なしへ統一されています。
-
-### `sudo certbot certificates`
-
-```
-Certificate Name: aoleaf.com
-  Key Type: ECDSA
-  Domains: aoleaf.com www.aoleaf.com
-  Expiry Date: 2026-12-07 15:27:46+00:00 (VALID: 89 days)
-  Certificate Path: /etc/letsencrypt/live/aoleaf.com/fullchain.pem
-  Private Key Path: /etc/letsencrypt/live/aoleaf.com/privkey.pem
-```
-
-| 項目 | 意味 |
-| --- | --- |
-| `Domains` | この証明書がカバーするドメイン。www あり・なしの両方が含まれるため、www 用の `server` ブロックでも同じ証明書を使える |
-| `Expiry Date ... (VALID: 89 days)` | 有効期限。Let's Encrypt の証明書は**90日**で切れる。短いのは、自動更新を前提とし、漏洩時の影響期間を短くするため |
-
-自動更新は systemd のタイマーが担当します。
-
-```
-$ sudo systemctl status certbot.timer
-● certbot.timer - Run certbot twice daily
-     Loaded: loaded (/usr/lib/systemd/system/certbot.timer; enabled; ...)
-     Active: active (waiting) since Tue 2026-09-08 16:24:07 UTC
-    Trigger: Wed 2026-09-09 04:34:50 UTC; 11h left
-```
-
-`enabled`（サーバー再起動後も有効）かつ `active (waiting)`（次回実行を待機中）。
-1日2回起動し、期限が30日を切っている証明書だけを実際に更新します。
-
-```
-$ sudo certbot renew --dry-run
-Congratulations, all simulated renewals succeeded:
-  /etc/letsencrypt/live/aoleaf.com/fullchain.pem (success)
-```
-
-更新処理を本番の証明書を消費せずに試験実行した結果です。
-90日後に自動更新が確実に動くことを、期限切れを待たずに検証できます。
-
-
-## 残課題
-
-| 項目 | 内容 |
-| --- | --- |
-| HSTS 未設定 | `Strict-Transport-Security` ヘッダを返していない。設定すると、ブラウザが2回目以降は最初から HTTPS で接続し、初回リダイレクト時の中間者攻撃の余地を無くせる。有効期間を長く設定すると取り消しが難しいため、運用が安定してから導入するのが望ましい |
-| Certbot による設定の上書き | www 分離のため 443 の `server` ブロックを手動編集している。`certbot --nginx` を再実行すると www が書き戻される可能性がある（`certbot renew` は設定ファイルを変更しないため通常運用では影響しない） |
-| コンテナの自動起動 | Week 11 からの継続課題。`restart: always` が未設定のため、EC2 再起動後にコンテナが復帰しない。ホストの Nginx と Certbot タイマーは systemd により自動復帰するので、**アプリだけが起動しない**状態になる |
 
 ---
 
@@ -1047,8 +715,7 @@ Congratulations, all simulated renewals succeeded:
 | タイプ | ポート | ソース | 理由 |
 | --- | --- | --- | --- |
 | SSH | 22 | マイ IP（`/32`） | ログインするのは自分だけでよい。`0.0.0.0/0` にすると、公開直後から総当たりログイン試行の標的になる |
-| HTTP | 80 | `0.0.0.0/0` | HTTPS へのリダイレクトと、Let's Encrypt の HTTP-01 検証で必要 |
-| HTTPS | 443 | `0.0.0.0/0` | 不特定多数が閲覧する Web サーバーのため、全許可でなければ役目を果たさない 
+| HTTP | 80 | `0.0.0.0/0` | 不特定多数が閲覧する Web サーバーのため、全許可でなければ役目を果たさない |
 
 ### RDS 側（`rds-ec2-1`）
 
@@ -1058,15 +725,11 @@ Congratulations, all simulated renewals succeeded:
 
 ### 設計上の判断
 
->**443 を後から開けた理由**
->
-> Week 11 の時点では HTTPS を提供していなかったため、443 は閉じていました。
-> 待ち受けるプロセスが無いポートを開けても、攻撃対象領域が増えるだけで得るものがありません。
-> ドメインと証明書を用意した Week 13 で追加しています。
-> **必要になってから開ける**という判断そのものが、最小権限の実践です。
->
-> 逆に、アプリケーションコンテナの公開ポートは `127.0.0.1:8000` に**閉じました**。
-> 開けるだけでなく、不要になったものを閉じるのも同じ原則の一部です（後述）。
+**443 を開けていない理由**
+
+現時点で HTTPS を提供していないためです。待ち受けるプロセスが無いポートを開けても、
+攻撃対象領域が増えるだけで得るものがありません。ドメインと証明書を用意する段階で追加します。
+**必要になってから開ける**という判断そのものが、最小権限の実践です。
 
 **ソースに IP ではなくセキュリティグループ ID を指定した理由**
 
