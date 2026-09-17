@@ -87,4 +87,37 @@ class PostLikeTest extends TestCase
 
         $this->assertDatabaseCount('likes', 0);
     }
+
+    public function test_unliking_post_never_liked_does_not_break(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+        Post::factory()->create();
+
+        $this->actingAs($user)
+            ->from(route('posts.show', $post))
+            ->delete(route('posts.unlike', $post))
+            ->assertRedirect(route('posts.show', $post));
+
+        $this->assertDatabaseCount('likes', 0);
+    }
+
+    public function test_unliking_does_not_remove_other_users_like(): void
+    {
+        $post = Post::factory()->create();
+        $other = User::factory()->create();
+
+        $this->actingAs($other)->post(route('posts.like', $post));
+
+        $this->actingAs(User::factory()->create())
+            ->from(route('posts.show', $post))
+            ->delete(route('posts.unlike', $post))
+            ->assertRedirect(route('posts.show', $post));
+
+        $this->assertDatabaseCount('likes', 1);
+        $this->assertDatabaseHas('likes', [
+            'user_id' => $other->id,
+            'post_id' => $post->id,
+        ]);
+    }
 }
