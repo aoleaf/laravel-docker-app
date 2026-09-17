@@ -120,4 +120,17 @@ class PostLikeTest extends TestCase
             'post_id' => $post->id,
         ]);
     }
+
+    public function test_index_shows_like_count(): void
+    {
+        $post = Post::factory()->create(['title' => 'いいねされた投稿']);
+
+        foreach (User::factory()->count(2)->create() as $user) {
+            $this->actingAs($user)->post(route('posts.like', $post));
+        }
+
+        $this->get(route('posts.index'))
+            ->assertOk()
+            ->assertSee('いいね 2');
+    }
 }

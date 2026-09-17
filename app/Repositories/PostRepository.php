@@ -10,7 +10,7 @@ class PostRepository
 {
     public function paginateLatest(int $perPage = 10): LengthAwarePaginator
     {
-        return Post::with('user')->latest()->paginate($perPage);
+        return Post::with('user')->withCount('likes')->latest()->paginate($perPage);
     }
 
     public function createFor(User $user, array $attributes): Post

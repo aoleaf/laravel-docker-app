@@ -25,7 +25,8 @@
             @endif
             <p>{{ Str::limit($post->content, 100) }}</p>
             <small>
-                {{ $post->user->name }} / {{ $post->created_at->format('Y年m月d日') }}
+                いいね {{ $post->likes_count }}
+                / {{ $post->user->name }} / {{ $post->created_at->format('Y年m月d日') }}
                 @can('update', $post)
                     <a href="{{ route('posts.edit', $post) }}">編集</a>
                 @endcan
