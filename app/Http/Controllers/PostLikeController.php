@@ -9,7 +9,7 @@ class PostLikeController extends Controller
 {
     public function store(Request $request, Post $post)
     {
-        $post->likes()->create(['user_id' => $request->user()->id]);
+        $post->likes()->firstOrCreate(['user_id' => $request->user()->id]);
 
         return back();
     }

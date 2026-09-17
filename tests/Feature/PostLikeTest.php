@@ -49,4 +49,18 @@ class PostLikeTest extends TestCase
             'post_id' => $post->id,
         ]);
     }
+
+    public function test_liking_same_post_twice_keeps_one_like(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+
+        $this->actingAs($user)->post(route('posts.like', $post));
+        $this->actingAs($user)
+            ->from(route('posts.show', $post))
+            ->post(route('posts.like', $post))
+            ->assertRedirect(route('posts.show', $post));
+
+        $this->assertDatabaseCount('likes', 1);
+    }
 }
