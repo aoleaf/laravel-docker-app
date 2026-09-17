@@ -72,4 +72,19 @@ class PostLikeTest extends TestCase
 
         $this->assertDatabaseCount('likes', 0);
     }
+
+    public function test_user_can_unlike_post(): void
+    {
+        $user = User::factory()->create();
+        $post = Post::factory()->create();
+
+        $this->actingAs($user)->post(route('posts.like', $post));
+
+        $this->actingAs($user)
+            ->from(route('posts.show', $post))
+            ->delete(route('posts.unlike', $post))
+            ->assertRedirect(route('posts.show', $post));
+
+        $this->assertDatabaseCount('likes', 0);
+    }
 }
