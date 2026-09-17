@@ -63,4 +63,13 @@ class PostLikeTest extends TestCase
 
         $this->assertDatabaseCount('likes', 1);
     }
+
+    public function test_guest_cannot_like_post(): void
+    {
+        $post = Post::factory()->create();
+
+        $this->post(route('posts.like', $post))->assertRedirect('/login');
+
+        $this->assertDatabaseCount('likes', 0);
+    }
 }

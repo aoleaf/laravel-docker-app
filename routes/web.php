@@ -33,7 +33,8 @@ Route::resource('posts', PostController::class)
     ->middleware('auth');
 Route::resource('posts', PostController::class)->only(['index', 'show']);
 
-Route::post('posts/{post}/like', [PostLikeController::class, 'store'])->name('posts.like');
+Route::post('posts/{post}/like', [PostLikeController::class, 'store'])
+    ->middleware('auth')->name('posts.like');
 
 // タスク：全て自分のものだけ。未ログインは一切触れない
 Route::middleware('auth')->group(function () {
