@@ -18,8 +18,8 @@ class TaskFactory extends Factory
     {
         return [
             'user_id' => User::factory(),
-            'title' => fake()->realText(30),
-            'description' => fake()->realText(120),
+            'title' => fake()->sentence(),
+            'description' => fake()->paragraph(),
             'status' => TaskStatus::Todo->value,
             'due_date' => fake()->dateTimeBetween('-1 week', '+3 weeks')->format('Y-m-d'),
             'completed_at' => null,

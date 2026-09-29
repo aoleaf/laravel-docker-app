@@ -3,6 +3,7 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\PostController;
+use App\Http\Controllers\PostLikeController;
 use App\Http\Controllers\ProductController;
 use App\Http\Controllers\EventController;
 use App\Http\Controllers\ReservationController;
@@ -31,6 +32,11 @@ Route::resource('posts', PostController::class)
     ->except(['index', 'show'])
     ->middleware('auth');
 Route::resource('posts', PostController::class)->only(['index', 'show']);
+
+Route::middleware('auth')->group(function () {
+    Route::post('posts/{post}/like', [PostLikeController::class, 'store'])->name('posts.like');
+    Route::delete('posts/{post}/like', [PostLikeController::class, 'destroy'])->name('posts.unlike');
+});
 
 // タスク：全て自分のものだけ。未ログインは一切触れない
 Route::middleware('auth')->group(function () {

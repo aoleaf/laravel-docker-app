@@ -1,0 +1,38 @@
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # 毎週月曜 09:00 JST（新しい脆弱性は自分のコミットとは無関係に公開される）
+    - cron: '0 0 * * 1'
+
+jobs:
+  npm-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm audit --audit-level=high
+
+  composer-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+
+      # 開発環境も攻撃対象になり得るので --no-dev にはしない
+      - run: composer install --prefer-dist --no-progress --no-interaction
+
+      - run: composer audit
