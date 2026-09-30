@@ -12,14 +12,14 @@ class TaskCrudTest extends TestCase
 {
     use RefreshDatabase;
 
-    //---- ゲスト ----
+    // ---- ゲスト ----
 
     public function test_guest_cannot_see_task_list(): void
     {
         $this->get(route('tasks.index'))->assertRedirect('/login');
     }
 
-    //---- 一覧 ----
+    // ---- 一覧 ----
 
     public function test_index_shows_only_own_tasks(): void
     {
@@ -66,7 +66,7 @@ class TaskCrudTest extends TestCase
             ->assertDontSee('期限切れだが未着手のタスク');
     }
 
-    //---- 作成 ----
+    // ---- 作成 ----
 
     public function test_owner_can_open_create_form(): void
     {
@@ -113,7 +113,7 @@ class TaskCrudTest extends TestCase
         $this->assertDatabaseCount('tasks', 0);
     }
 
-    //---- 詳細・編集 ----
+    // ---- 詳細・編集 ----
 
     public function test_owner_can_see_task_detail(): void
     {
@@ -149,7 +149,7 @@ class TaskCrudTest extends TestCase
             ->assertSee('編集前のタイトル');
     }
 
-    //---- 更新・削除 ----
+    // ---- 更新・削除 ----
 
     public function test_update_changes_title_but_not_status(): void
     {
@@ -186,7 +186,7 @@ class TaskCrudTest extends TestCase
         $this->assertDatabaseMissing('tasks', ['id' => $task->id]);
     }
 
-    //---- 状態遷移 ----
+    // ---- 状態遷移 ----
 
     public function test_complete_marks_task_done(): void
     {

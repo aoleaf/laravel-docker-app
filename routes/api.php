@@ -2,7 +2,6 @@
 
 use App\Http\Controllers\Api\PostController;
 use App\Http\Controllers\Api\StripeWebhookController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 // ここに書いたルートは自動で /api が先頭に付き、CSRFトークンのチェックが免除される。

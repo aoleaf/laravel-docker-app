@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Filesystem\FilesystemAdapter;
 use Illuminate\Support\Facades\Storage;
 
 class Post extends Model
@@ -55,7 +56,7 @@ class Post extends Model
             }
 
             // Storage::disk()の戻り型はurl()を持たないFilesystem契約なので実体を明示する
-            /** @var \Illuminate\Filesystem\FilesystemAdapter $disk */
+            /** @var FilesystemAdapter $disk */
             $disk = Storage::disk(self::IMAGE_DISK);
 
             return $disk->url($this->image_path);

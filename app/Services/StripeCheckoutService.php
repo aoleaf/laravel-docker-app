@@ -32,19 +32,19 @@ class StripeCheckoutService
             'mode' => 'payment',
             'line_items' => [[
                 'price_data' => [
-                    'currency'     => 'jpy',
-                    'unit_amount'  => $product->price,
+                    'currency' => 'jpy',
+                    'unit_amount' => $product->price,
                     'product_data' => $productData,
                 ],
                 'quantity' => 1,
             ]],
             'success_url' => route('checkout.success').'?session_id={CHECKOUT_SESSION_ID}',
-            'cancel_url'  => route('checkout.cancel'),
-            'customer_email'       => $user?->email,
-            'client_reference_id'  => (string) ($user?->id ?? ''),
+            'cancel_url' => route('checkout.cancel'),
+            'customer_email' => $user?->email,
+            'client_reference_id' => (string) ($user?->id ?? ''),
             'metadata' => [
                 'product_id' => (string) $product->id,
-                'user_id'    => (string) ($user?->id ?? ''),
+                'user_id' => (string) ($user?->id ?? ''),
             ],
         ]);
     }
@@ -63,12 +63,12 @@ class StripeCheckoutService
             ['stripe_session_id' => $session->id],
             [
                 'stripe_payment_intent_id' => is_string($paymentIntent) ? $paymentIntent : $paymentIntent?->id,
-                'user_id'        => ($session->metadata['user_id'] ?? null) ?: null,
-                'product_id'     => ($session->metadata['product_id'] ?? null) ?: null,
+                'user_id' => ($session->metadata['user_id'] ?? null) ?: null,
+                'product_id' => ($session->metadata['product_id'] ?? null) ?: null,
                 'customer_email' => $session->customer_details?->email ?? $session->customer_email,
-                'amount'         => $session->amount_total,
-                'currency'       => $session->currency,
-                'status'         => $session->payment_status,
+                'amount' => $session->amount_total,
+                'currency' => $session->currency,
+                'status' => $session->payment_status,
             ]
         );
     }

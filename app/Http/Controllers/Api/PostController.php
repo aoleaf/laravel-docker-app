@@ -42,6 +42,7 @@ class PostController extends Controller
         //   ヒント: $request->validated() で検証済みの配列が取れる
         //   ヒント: return (new PostResource($post))->response()->setStatusCode(201);
         $post = $this->postService->createFor($user, $request->validated());
+
         return (new PostResource($post))->response()->setStatusCode(201);
     }
 }
