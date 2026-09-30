@@ -1,14 +1,14 @@
 <?php
 
-use App\Http\Controllers\ProfileController;
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\CheckoutController;
+use App\Http\Controllers\EventController;
 use App\Http\Controllers\PostController;
 use App\Http\Controllers\PostLikeController;
 use App\Http\Controllers\ProductController;
-use App\Http\Controllers\EventController;
+use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\ReservationController;
 use App\Http\Controllers\TaskController;
-use App\Http\Controllers\CheckoutController;
+use Illuminate\Support\Facades\Route;
 
 // 基本的なルート（GETリクエストで / にアクセスしたら welcome ビューを返す）
 Route::get('/', function () {
@@ -24,7 +24,6 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-
 
 // 投稿：閲覧は誰でも、作成・編集・削除はログイン必須
 // create を先に登録しないと /posts/create が show の {post} に吸われる

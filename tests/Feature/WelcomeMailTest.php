@@ -16,9 +16,9 @@ class WelcomeMailTest extends TestCase
         Mail::fake();
 
         $this->post('/register', [
-            'name'                  => 'テスト太郎',
-            'email'                 => 'taro@example.com',
-            'password'              => 'password',
+            'name' => 'テスト太郎',
+            'email' => 'taro@example.com',
+            'password' => 'password',
             'password_confirmation' => 'password',
         ]);
 
