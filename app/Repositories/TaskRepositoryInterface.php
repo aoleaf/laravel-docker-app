@@ -14,7 +14,7 @@ interface TaskRepositoryInterface
     public function paginateFor(User $user, array $filters = [], int $perPage = 10): LengthAwarePaginator;
 
     /**
-     * @return array<string, int>  ステータス値 => 件数
+     * @return array<string, int> ステータス値 => 件数
      */
     public function countByStatusFor(User $user): array;
 

@@ -44,8 +44,8 @@ class PostSeeder extends Seeder
                 'user_id' => $userIds[$i % count($userIds)],
                 'title' => $title,
                 'content' => "これはシーダーで作成したサンプル投稿です。\n\n"
-                    . "「{$title}」について調べたことをまとめました。"
-                    . '実際の運用では、ここに本文が入ります。',
+                    ."「{$title}」について調べたことをまとめました。"
+                    .'実際の運用では、ここに本文が入ります。',
                 'category' => $categories[$i % count($categories)],
                 'created_at' => $postedAt,
                 'updated_at' => $postedAt,

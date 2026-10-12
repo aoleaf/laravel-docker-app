@@ -21,7 +21,12 @@ jobs:
 
       - run: npm ci
 
-      - run: npm audit --audit-level=high
+      # ブラウザに配られる依存（dependencies）はhigh以上で落とす
+      - run: npm audit --omit=dev --audit-level=high
+
+      # ビルド時のみの依存は把握するだけ。ここで落とすと赤が常態化して本物を見逃す
+      - run: npm audit
+        continue-on-error: true
 
   composer-audit:
     runs-on: ubuntu-latest

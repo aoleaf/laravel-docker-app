@@ -86,7 +86,7 @@ class TaskController extends Controller
             ->with('success', 'タスクを削除しました');
     }
 
-    //---- 状態遷移 ----
+    // ---- 状態遷移 ----
 
     public function complete(Task $task)
     {

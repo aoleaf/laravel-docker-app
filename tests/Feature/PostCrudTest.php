@@ -7,8 +7,8 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Tests\TestCase;
 use PHPUnit\Framework\Attributes\DataProvider;
+use Tests\TestCase;
 
 class PostCrudTest extends TestCase
 {
@@ -54,7 +54,6 @@ class PostCrudTest extends TestCase
             ->assertOk()
             ->assertViewIs('posts.edit');
     }
-
 
     public static function requiredFieldProvider(): array
     {
@@ -142,5 +141,4 @@ class PostCrudTest extends TestCase
 
         Storage::disk(Post::IMAGE_DISK)->assertExists($post->image_path);
     }
-
 }

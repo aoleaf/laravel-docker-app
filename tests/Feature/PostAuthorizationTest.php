@@ -11,7 +11,7 @@ class PostAuthorizationTest extends TestCase
 {
     use RefreshDatabase;
 
-    //---- 閲覧は誰でも ----
+    // ---- 閲覧は誰でも ----
 
     public function test_ゲストでも一覧と詳細は見られる(): void
     {
@@ -21,7 +21,7 @@ class PostAuthorizationTest extends TestCase
         $this->get("/posts/{$post->id}")->assertOk();
     }
 
-    //---- 投稿はログインユーザーのみ ----
+    // ---- 投稿はログインユーザーのみ ----
 
     public function test_ゲストは投稿フォームにアクセスできない(): void
     {
@@ -73,7 +73,7 @@ class PostAuthorizationTest extends TestCase
         ]);
     }
 
-    //---- 編集・削除は作者本人のみ ----
+    // ---- 編集・削除は作者本人のみ ----
 
     public function test_他人の投稿は編集画面を開けない(): void
     {
@@ -138,11 +138,11 @@ class PostAuthorizationTest extends TestCase
         $this->assertDatabaseMissing('posts', ['id' => $post->id]);
     }
 
-    //---- セキュリティ ----
+    // ---- セキュリティ ----
 
     // CSRF検証自体はテスト実行中スキップされる（ValidateCsrfToken::runningUnitTests）ため
     // ここではトークンが埋め込まれていることだけ確認する。実際の419はブラウザ/curlで確認。
-    public function test_投稿フォームにCSRFトークンが埋め込まれている(): void
+    public function test_投稿フォームにcsrfトークンが埋め込まれている(): void
     {
         $this->actingAs(User::factory()->create())
             ->get('/posts/create')
@@ -163,7 +163,7 @@ class PostAuthorizationTest extends TestCase
             ->assertSee('&lt;script&gt;', false);
     }
 
-    public function test_SQLインジェクションを試みても全件は漏れない(): void
+    public function test_sqlインジェクションを試みても全件は漏れない(): void
     {
         Post::factory()->count(3)->create();
 

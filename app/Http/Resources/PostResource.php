@@ -2,7 +2,6 @@
 
 namespace App\Http\Resources;
 
-use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class PostResource extends JsonResource
@@ -10,7 +9,7 @@ class PostResource extends JsonResource
     public function toArray($request): array
     {
         return [
-            'id'    => $this->id,
+            'id' => $this->id,
             'title' => $this->title,
 
             // TODO BE-(1): content と category を同じ形で追加する

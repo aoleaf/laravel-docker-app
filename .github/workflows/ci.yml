@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+      
+      - name: PHP環境のセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_mysql, pdo_sqlite, exif, pcntl, bcmath, gd
+      
+      - name: Composerの依存関係をインストール
+        run: composer install --prefer-dist --no-progress
+      
+      - name: コードスタイルのチェック
+        run: vendor/bin/pint --test
+
+  test:
+    needs: lint
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: チェックアウト
+        uses: actions/checkout@v4
+      
+      - name: PHP環境のセットアップ
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: mbstring, pdo_mysql, pdo_sqlite, exif, pcntl, bcmath, gd
+          coverage: pcov
+      
+      - name: Composerの依存関係をインストール
+        run: composer install --prefer-dist --no-progress
+      
+      - name: .envファイルの作成
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+      
+      - name: テスト実行
+        run: |
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          php artisan test --coverage | tee -a $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

@@ -12,7 +12,7 @@ class PriceCalculatorBoundaryTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->calculator = new PriceCalculator();
+        $this->calculator = new PriceCalculator;
     }
 
     // 境界値: 割引率0%（有効範囲の下限）
