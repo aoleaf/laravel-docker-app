@@ -26,6 +26,10 @@ jobs:
       - name: コードスタイルのチェック
         run: vendor/bin/pint --test
 
+      # PHPStanはメモリを多く使うので既定の128Mでは途中で落ちる
+      - name: 静的解析
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=512M
+
   test:
     needs: lint
     runs-on: ubuntu-latest
