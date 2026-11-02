@@ -1,0 +1,16 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app
+
+    level: 5
+
+    ignoreErrors:
+        # Breeze生成コード。Userは MustVerifyEmail を実装していない（Breezeの既定でメール認証は無効）。
+        # Verified のコンストラクタは実行時に型を検査しないので動作はする。
+        # 認証を有効にするならUserにインターフェースを実装し、この除外を消す。
+        -
+            identifier: argument.type
+            path: app/Http/Controllers/Auth/VerifyEmailController.php

@@ -21,6 +21,7 @@ class Event extends Model
     ];
 
     // hasMany: イベント(1) → 予約(多)
+    /** @return HasMany<Reservation, $this> */
     public function reservations(): HasMany
     {
         return $this->hasMany(Reservation::class);
